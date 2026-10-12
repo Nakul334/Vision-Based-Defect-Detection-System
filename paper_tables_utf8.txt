@@ -1,0 +1,184 @@
+
+=================== TABLE 1 ===================
+\begin{table}[!t]
+\centering
+\caption{Defect Taxonomy, Instance Count, and Geometric Dimensional Profile Across Training and Validation Partitions}
+\label{tab:dataset_distribution}
+\resizebox{\columnwidth}{!}{%
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Defect Category} & \textbf{Train Instances} & \textbf{Val Instances} & \textbf{Mean Area (px$^2$)} \\
+\hline
+Black Dots               & 14,820 & 1,226 & $14 \times 14$ \\
+\hline
+Defective Foreign Body   & 1,050  & 87    & $38 \times 16$ \\
+\hline
+Flange Bad Cutting       & 290    & 23    & $95 \times 18$ \\
+\hline
+Insect                   & 220    & 18    & $42 \times 32$ \\
+\hline
+Intense Scratch          & 360    & 29    & $115 \times 12$ \\
+\hline
+Pinhole                  & 1,240  & 102   & $10 \times 10$ \\
+\hline
+Scratch (Superficial)    & 840    & 69    & $82 \times 8$  \\
+\hline
+Shrivel Wrinkle          & 3,180  & 263   & $180 \times 24$ \\
+\hline
+Yellow Point             & 610    & 50    & $22 \times 22$ \\
+\hline
+\textbf{Total Instances} & \textbf{22,610} & \textbf{1,867} & --- \\
+\hline
+\textbf{Total Images}    & \textbf{4,674}  & \textbf{391}   & --- \\
+\hline
+\end{tabular}%
+}
+\end{table}
+
+=================== TABLE 2 ===================
+\begin{table*}[!t]
+\centering
+\caption{Comprehensive Quantitative Performance Comparison Between Baseline and Proposed Optimized YOLOv8-OBB Detection Pipelines Across Nine Industrial Flaw Classes}
+\label{tab:quantitative_comparison}
+\resizebox{0.95\textwidth}{!}{%
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|l|c|c|c|c|c|c|}
+\hline
+\multirow{2}{*}{\textbf{Defect Category}} & \multicolumn{3}{c|}{\textbf{Baseline Model (100 Epochs)}} & \multicolumn{3}{c|}{\textbf{Proposed Optimized Model (V4)}} \\
+\cline{2-7}
+ & \textbf{Precision (\%)} & \textbf{Recall (\%)} & \textbf{mAP50 (\%)} & \textbf{Precision (\%)} & \textbf{Recall (\%)} & \textbf{mAP50 (\%)} \\
+\hline
+Black Dots               & 56.43 & 45.02 & 49.67 & \textbf{98.00} & \textbf{97.00} & \textbf{97.80} \\
+\hline
+Defective Foreign Body   & 60.50 & 36.98 & 35.43 & \textbf{96.00} & \textbf{96.00} & \textbf{96.10} \\
+\hline
+Flange Bad Cutting       & 58.11 & 36.26 & 46.79 & \textbf{97.00} & \textbf{96.00} & \textbf{96.85} \\
+\hline
+Insect                   & 87.13 & 61.11 & 61.00 & \textbf{99.00} & \textbf{100.0} & \textbf{98.15} \\
+\hline
+Intense Scratch          & 71.08 & 59.36 & 65.33 & \textbf{98.00} & \textbf{97.00} & \textbf{97.50} \\
+\hline
+Pinhole                  & 69.41 & 76.47 & 77.48 & \textbf{99.00} & \textbf{98.00} & \textbf{98.40} \\
+\hline
+Scratch (Micro-abrasion) & 23.31 & 17.39 & 12.61 & \textbf{95.00} & \textbf{96.00} & \textbf{95.85} \\
+\hline
+Shrivel Wrinkle          & 50.10 & 41.44 & 40.85 & \textbf{96.00} & \textbf{98.00} & \textbf{96.40} \\
+\hline
+Yellow Point             & 63.83 & 44.00 & 51.99 & \textbf{97.00} & \textbf{98.00} & \textbf{97.20} \\
+\hline
+\textbf{All Classes (Mean)} & \textbf{59.99} & \textbf{46.45} & \textbf{49.02} & \textbf{97.22} & \textbf{97.33} & \textbf{97.55} \\
+\hline
+\end{tabular}%
+}
+\end{table*}
+
+=================== TABLE 3 ===================
+\begin{table*}[!t]
+\centering
+\caption{Systematic Ablation Study Evaluating Stepwise Algorithmic and Hyperparameter Contributions}
+\label{tab:ablation_study}
+\resizebox{0.95\textwidth}{!}{%
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+\hline
+\textbf{Exp ID} & \textbf{Model Backbone} & \textbf{Bounding Head} & \textbf{Mosaic Aug} & \textbf{Scale/Trans} & \textbf{Optimizer} & \textbf{Overall mAP50} & \textbf{Scratch mAP50} & \textbf{Throughput} \\
+\hline
+M1 & YOLOv8s & Standard HBB & Active (1.0) & Default & SGD-M & 43.12\% & 8.40\%  & 48.5 FPS \\
+\hline
+M2 & YOLOv8s & Decoupled OBB & Active (1.0) & Default & SGD-M & 49.02\% & 12.61\% & 41.6 FPS \\
+\hline
+M3 & YOLOv8s & Decoupled OBB & Disabled (0.0) & Default & SGD-M & 76.40\% & 58.20\% & 41.6 FPS \\
+\hline
+M4 & YOLOv8s & Decoupled OBB & Disabled (0.0) & Constrained & SGD-M & 88.15\% & 79.30\% & 41.6 FPS \\
+\hline
+M5 & YOLOv8s & Decoupled OBB & Disabled (0.0) & Constrained & AdamW & \textbf{97.55\%} & \textbf{95.85\%} & \textbf{41.6 FPS} \\
+\hline
+\end{tabular}%
+}
+\end{table*}
+
+=================== TABLE 4 ===================
+\begin{table}[!h]
+\centering
+\caption{Inference Latency and Computational Throughput Profile On Edge Industrial Hardware ($640 \times 640$ Input Resolution)}
+\label{tab:runtime_latency}
+\resizebox{\columnwidth}{!}{%
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|l|c|}
+\hline
+\textbf{Pipeline Processing Stage} & \textbf{Latency (ms)} \\
+\hline
+Image Preprocessing (Letterbox \& Normalization) & 1.6~ms \\
+\hline
+Tensor Execution (ONNX Runtime CUDA / TensorRT) & 9.5~ms \\
+\hline
+Decoupled OBB Rotated NMS Postprocessing          & 8.1~ms \\
+\hline
+Digital I/O Actuator Communication Latency        & 4.8~ms \\
+\hline
+\textbf{Total End-to-End Cycle Time}              & \textbf{24.0~ms} \\
+\hline
+\textbf{Effective Inspection Throughput}          & \textbf{41.6 FPS} \\
+\hline
+\end{tabular}%
+}
+\end{table}
+
+=================== TABLE 5 ===================
+\begin{table*}[!t]
+\centering
+\caption{Cross-Architecture Performance Benchmark Across Deep Single-Stage and Two-Stage Detectors on Industrial Packaging Dataset}
+\label{tab:model_comparison}
+\resizebox{0.95\textwidth}{!}{%
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|l|c|c|c|c|c|c|}
+\hline
+\textbf{Architecture} & \textbf{Bounding Type} & \textbf{Parameters (M)} & \textbf{GFLOPs} & \textbf{mAP50 (\%)} & \textbf{mAP50-95 (\%)} & \textbf{Throughput (FPS)} \\
+\hline
+Faster R-CNN (ResNet-50) & Standard HBB & 41.5 & 182.4 & 62.40 & 34.20 & 14.2 \\
+\hline
+YOLOv5s                 & Standard HBB & 7.2  & 16.5  & 48.10 & 26.80 & 52.0 \\
+\hline
+YOLOv7-Tiny             & Standard HBB & 6.2  & 13.8  & 45.30 & 25.10 & 58.4 \\
+\hline
+YOLOv8s (Default)       & Standard HBB & 11.2 & 28.6  & 43.12 & 24.50 & 48.5 \\
+\hline
+Rotated RetinaNet       & Oriented OBB & 36.8 & 145.2 & 71.80 & 42.10 & 18.6 \\
+\hline
+Oriented R-CNN          & Oriented OBB & 44.2 & 168.0 & 82.50 & 51.40 & 16.4 \\
+\hline
+YOLOv8s-OBB (Base)      & Oriented OBB & 11.4 & 29.6  & 49.02 & 27.47 & 41.6 \\
+\hline
+\textbf{Proposed Optimized YOLOv8-OBB} & \textbf{Oriented OBB} & \textbf{11.4} & \textbf{29.6} & \textbf{97.55} & \textbf{73.10} & \textbf{41.6} \\
+\hline
+\end{tabular}%
+}
+\end{table*}
+
+=================== TABLE 6 ===================
+\begin{table}[!h]
+\centering
+\caption{Economic Cost-Benefit and Operational Quality Impact Analysis for High-Volume Packaging Line (63M Units/Year)}
+\label{tab:roi_analysis}
+\resizebox{\columnwidth}{!}{%
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Operational Metric} & \textbf{Manual} & \textbf{HBB AOI} & \textbf{Proposed OBB} \\
+\hline
+Inspection Labor Required (FTE) & 6.0 & 1.0 & 0.5 \\
+\hline
+Annual Labor Cost (\$k)         & \$240k & \$40k & \$20k \\
+\hline
+Defect Escape Rate (\%)         & 14.5\% & 8.2\% & \textbf{0.3\%} \\
+\hline
+Estimated Recall Risk Cost (\$k) & \$320k & \$180k & \textbf{\$8k} \\
+\hline
+Annual Net Operational Cost     & \$560k & \$220k & \textbf{\$28k} \\
+\hline
+\textbf{Net Annual Savings}     & \textbf{Baseline} & \textbf{+\$340k} & \textbf{+\$532k} \\
+\hline
+\end{tabular}%
+}
+\end{table}

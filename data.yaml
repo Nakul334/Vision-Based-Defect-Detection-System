@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 6
+names: ['black_dots', 'defective_foriegn_body', 'flange_bad_cutting', 'pinhole', 'scratch', 'shrival_wrinklle']
+
+roboflow:
+  workspace: juggank2
+  project: rice_case_01
+  version: dataset
+  license: CC BY 4.0
+  url: https://app.roboflow.com/juggank2/rice_case_01/dataset

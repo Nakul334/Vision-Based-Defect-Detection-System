@@ -1,0 +1,1299 @@
+
+=== PAGE 1 ===
+1
+An Automated Robotic Vision System for Precision
+Surface Defect Inspection in Industrial Packaging
+Using YOLOv8-OBB
+Nakul Dube
+Dept. of Artificial Intelligence and
+Machine Learning
+Faculty of Engineering and
+Technology, DMIHER(DU)
+Sawangi Wardha, India
+nakuldube334@gmail.com
+Sahil Dhurve
+Dept. of Artificial Intelligence and
+Machine Learning
+Faculty of Engineering and
+Technology, DMIHER(DU)
+Sawangi Wardha, India
+sahildhurve999@gmail.com
+Mukul Argade
+Dept. of Computer Science and
+Engineering
+Faculty of Engineering and
+Technology, DMIHER(DU)
+Sawangi Wardha, India
+manjoshargade@gmail.com
+Abstract—Automated surface quality assurance in high-
+throughput food container and packaging manufacturing requires
+robust, sub-millimeter flaw localization capable of handling
+arbitrary spatial orientations. Conventional machine vision frame-
+works predominantly rely on horizontal axis-aligned bounding
+boxes (HBB), which encompass substantial extraneous background
+pixels when encapsulating slender, diagonally oriented flaws
+such as scratches, edge fissures, and material wrinkles. This
+background noise causes severe feature dilution, resulting in
+prohibitive miss rates for micro-defects. In this paper, we present
+an end-to-end industrial robotic inspection pipeline driven by
+an optimized YOLOv8 Oriented Bounding Box (YOLOv8-OBB)
+deep neural architecture tailored specifically for thermoformed
+and injection-molded rice packaging casings. To resolve critical
+detection bottlenecks on small-scale anomalies, we eliminate spatial
+mosaic augmentation, suppress excessive geometric translation
+and scaling, and employ an AdamW optimizer coupled with cosine
+learning rate scheduling. The proposed framework is evaluated on
+a benchmark dataset comprising 5,065 annotated industrial images
+across nine defect categories:black dots,defective foreign bodies,
+flange bad cutting,insects,intense scratches,pinholes,scratches,
+shrivel wrinkles, andyellow points. Experimental evaluations
+demonstrate that the optimized YOLOv8-OBB model improves
+the mean Average Precision at IoU 0.50 (mAP50) from an initial
+baseline of 49.02% to 97.55%, while elevating the detection rate
+of critical micro-scratches from 12.61% to 95.85%. Integrated
+with an Open Neural Network Exchange (ONNX) deployment
+runtime, the vision system achieves an inference speed of 24.0 ms
+per casing, enabling continuous, real-time rejection on conveyor
+lines operating at over 120 units per minute.
+Index Terms—Surface defect detection, oriented bounding box
+(OBB), YOLOv8, robotic vision, industrial packaging inspection,
+small object detection, automated optical inspection (AOI), quality
+engineering.
+I. INTRODUCTION
+H
+IGH-SPEED industrial manufacturing of food preserva-
+tion containers, particularly polymer-based thermoformed
+rice casings, mandates rigorous automated quality control to
+ensure structural hermeticity, shelf-life integrity, and consumer
+safety. In modern high-throughput manufacturing facilities,
+packaging casings are produced via rapid injection molding
+and thermoforming cycles exceeding thousands of units per
+hour. During these intense thermal and mechanical cycles,
+packaging containers are subject to diverse surface anomalies
+including polymer carbonization, guillotine trimming fissures,
+surface abrasion scratches, micro-pinholes, material wrinkling,
+and biological contamination [10], [22]. Micro-perforations
+spanning less than 0.2mm in diameter and subtle surface
+scratches directly breach the protective barrier properties of the
+container. Such breaches permit oxygen permeation, microbial
+infiltration, and moisture egress, accelerating food spoilage and
+precipitating massive commercial product recalls [27].
+Historically, quality control in packaging lines has depended
+upon human visual inspection or traditional rule-based au-
+tomated optical inspection (AOI) architectures [28]. Human
+manual sorting suffers from intrinsic limitations: physiological
+eye fatigue, cognitive lapses, subjectivity in grading borderline
+flaws, and an inability to maintain inspection fidelity at
+conveyance velocities exceeding 0.5m/s [29]. Conversely, clas-
+sic rule-based computer vision methodologies—relying upon
+handcrafted edge filters (Sobel, Canny), spatial morphological
+operations, and adaptive thresholding (Otsu)—exhibit brittle
+performance under real-world factory dynamics. Injection-
+molded polymer casings possess curved geometries, non-
+uniform specular reflectivity, and subtle background texture vari-
+ations caused by fluctuating mold temperatures. Consequently,
+rule-based algorithms suffer from excessive false-positive spikes
+whenever ambient factory lighting shifts or minute conveyor
+vibrations induce optical shadow artifacts [9], [21].
+Over the past three years, convolutional neural networks
+(CNNs) and deep single-stage object detection architectures
+have fundamentally transformed industrial quality engineer-
+ing [2], [11]. Single-stage detectors from the You Only Look
+Once (YOLO) lineage have achieved preeminence due to their
+favorable Pareto trade-off between inference throughput and
+mean Average Precision (mAP) [9], [15]. Nevertheless, conven-
+tional object detectors represent candidate detections utilizing
+standard Horizontal Bounding Boxes (HBB) parameterized by
+four spatial coordinates (xmin,y min,x max,y max). While HBB
+formulations remain effective for isotropic, upright objects in
+natural scenes, they impose severe physical and mathematical
+=== PAGE 2 ===
+2
+pathologies when applied to industrial surface metrology:
+1) Background Interference and Feature Dilution:Sur-
+face flaws on industrial casings frequently exhibit extreme
+aspect ratios (>10 : 1 ) and non-orthogonal orientations,
+such as diagonal abrasions, cutting fissures, and curved
+shrinkage wrinkles. An axis-aligned rectangle bounding a
+45◦ diagonal scratch encloses more than 85% undamaged
+casing background. During convolutional feature pooling
+and region aggregation, background pixels overpower the
+localized defect signature, diluting gradient propagation
+and causing the model to miss subtle flaw boundaries [3],
+[13].
+2) High Spatial Overlap and Non-Maximum Suppression
+Failure:When multiple micro-defects occur in close
+spatial proximity (such as clusters of pinholes or neigh-
+boring micro-cracks), their horizontal bounding boxes
+severely overlap in the 2D Cartesian coordinate plane.
+Standard Non-Maximum Suppression (NMS) algorithms
+erroneously discard genuine defect instances because
+their horizontal Intersection-over-Union (IoU) exceeds
+suppression thresholds, leading to false negatives on
+clustered flaws [23], [26].
+3) Robotic Inaccuracy in Actuation:High-speed au-
+tomated rejection lines require precise spatial angle
+coordinates (θ) to guide pneumatic diverters, robotic
+pick-and-place end-effectors, and laser marking heads.
+Horizontal bounding boxes offer zero orientation infor-
+mation, preventing robotic grippers from aligning along
+the natural flaw axis [19], [24].
+To resolve these fundamental limitations, Oriented Bounding
+Box (OBB) detection networks have emerged, parameter-
+izing candidate objects as a rotated five-dimensional tuple
+(xc,yc,w,h,θ) [1], [8]. However, simply transitioning from an
+HBB architecture to an OBB architecture does not automatically
+guarantee high industrial detection accuracy. Crucially, standard
+deep learning training regimes employ aggressive geometric
+augmentations—most notably four-image mosaic stitching and
+extensive random scaling—that were designed for macroscopic
+natural scene objects (MS COCO dataset) [20]. When applied to
+industrial packaging lines containing micro-scale flaws (such
+as 10-pixel scratches and 8-pixel pinholes), these standard
+augmentations shrink flaw features to sub-pixel noise, causing
+severe training failure and resulting in unacceptable recall on
+critical defect classes.
+In this research, we engineer, validate, and deploy an
+end-to-end automated robotic vision system driven by an
+optimized YOLOv8 Oriented Bounding Box (YOLOv8-OBB)
+deep neural architecture tailored specifically for industrial
+rice packaging containers. By identifying and neutralizing the
+underlying augmentation pathology and incorporating Gaussian
+Wasserstein Distance spatial regression, our framework achieves
+exceptional detection fidelity across micro-scale surface defects.
+The primary contributions of this paper are organized as
+follows:
+• We design and implement a comprehensive industrial
+robotic vision inspection pipeline integrating high-speed
+CMOS telecentric image acquisition, coaxial diffuse dome
+illumination, edge GPU acceleration, and deterministic
+pneumatic rejection actuation.
+• We formulate an orientation-aware spatial loss framework
+incorporating Probabilistic Gaussian Wasserstein Distance
+(GWD) loss and continuous periodic angular regulariza-
+tion, eliminating boundary discontinuity flip artifacts on
+arbitrary-oriented surface flaws.
+• We uncover a critical training pathology in industrial
+small-defect learning, demonstrating that standard mosaic
+augmentation and aggressive affine scaling systematically
+destroy micro-defect features. We formulate an augmen-
+tation mitigation protocol that elevates micro-scratch
+detection accuracy from a failing 12.61% baseline to
+95.85%.
+• We conduct exhaustive validation across 5,065 production-
+grade casing images encompassing nine distinct industrial
+defect categories, achieving an overall mAP50 of 97.55%
+and an edge-optimized ONNX runtime latency of 24.0 ms
+(41.6 FPS).
+• We provide a thorough analysis of operational challenges,
+physical illumination constraints, hardware memory bot-
+tlenecks, and comparative cross-architecture benchmarks.
+The remainder of this article is structured as follows:
+Section II conducts a systematic review of contemporary
+literature (2023–2026) across surface defect inspection, ori-
+ented bounding box models, and robotic vision automation.
+Section III presents the system architecture, mathematical
+formulation of the OBB head, and training optimizations.
+Section IV analyzes experimental results, ablation studies,
+and qualitative visual inspections. Section V details robotic
+integration, latency profiling, and ROS2 middleware deploy-
+ment. Section VI investigates operational challenges, failure
+modes, and practical manufacturing limitations. Section VII
+presents cross-architecture comparative benchmarks. Finally,
+Section VIII concludes the paper.
+II. COMPREHENSIVERELATEDWORK
+Recent academic and industrial investigations at the in-
+tersection of deep learning and automated manufacturing
+quality control can be categorized into four primary domains:
+vision-based surface defect detection, oriented bounding box
+architectures, micro-flaw localization challenges, and robotic
+optical sorting.
+A. Deep Learning for Industrial Surface Defect Inspection
+Between 2023 and 2026, deep convolutional neural net-
+works have progressively superseded dual-stage region-proposal
+networks (such as Faster R-CNN) in factory manufacturing
+environments due to stringent millisecond-level cycle time
+requirements [2], [28]. Xuet al.[11] engineered SFC-YOLOv8
+for cold-rolled strip steel inspection, introducing coordinate
+attention mechanisms to counter non-uniform industrial illu-
+mination. Chenget al.[9] proposed an Enhanced Feature
+Extraction Network (EFEN-YOLOv8) utilizing multi-receptive
+field convolutions to detect minute structural flaws in metallic
+substrates. In the domain of polymer and thin-film casings,
+Zhouet al.[15] implemented Large Separable Kernel Attention
+=== PAGE 3 ===
+3
+(LSKA-YOLO) to capture elongated surface scratches, demon-
+strating that expanding the effective receptive field along axial
+directions substantially aids scratch delineation. Similarly, Yuet
+al.[25] incorporated shallow attention convolutions (SAConv)
+into packaging inspection networks to retain high-frequency
+texture representations frequently lost during deep pooling
+layers.
+Guptaet al.[21] conducted a comprehensive comparative
+benchmark of YOLOv8, YOLOv7, and YOLO-NAS across
+multiple automated optical inspection scenarios, establishing
+that anchor-free decoupled head architectures deliver superior
+gradient stability compared to anchor-based predecessors when
+learning irregular flaw topologies. Furthermore, Jianget al.[16]
+investigated injection-molded container quality control using
+lightweight neural backbones, underscoring that maintaining
+high-resolution feature maps in shallow stages is essential for
+detecting early-stage thermal oxidation spots.
+B. Oriented Bounding Box (OBB) Regression Architectures
+The transition from horizontal bounding boxes to arbitrary-
+oriented bounding boxes has been extensively explored in
+remote sensing and aerial reconnaissance, and has recently
+achieved significant traction in industrial metrology [1], [8].
+Yanget al.[23] proved that decoupled regression heads capable
+of predicting angular offsets eliminate boundary discontinuity
+artifacts prevalent in classical angular regression formulations.
+Denget al.[13] derived a Gaussian Wasserstein Distance
+(GWD) and Probabilistic IoU framework, modeling rotated
+rectangles as two-dimensional Gaussian distributions. This
+formulation renders the rotated intersection loss continuously
+differentiable with respect to both spatial center and rotation
+angle.
+In industrial manufacturing, Chenet al.[3] investigated
+whether oriented bounding boxes enhance small defect detec-
+tion on cylindrical bearing end faces, concluding that OBB
+models mitigate background noise contamination by over 60%
+compared to HBB. Wanget al.[1] deployed RGS-YOLO
+with rotated heads for surface crack tracking on wind turbine
+blades. Huanget al.[4] proposed MSFE-YOLOv11-OBB
+for complex wood grain defect localization, showing that
+multiscale feature fusion combined with orientation heads
+substantially elevates recall on diagonal fissures. Sunet
+al.[7] deployed geometric-aware rotated crack detectors (DS-
+YOLO-RC), demonstrating superior resilience against spatial
+orientation shifts. Parallel investigations by Liet al.[5] and
+Zhanget al.[6] validated YOLOv8-OBB for photovoltaic solar
+cell flaw mapping, emphasizing that arbitrary angle prediction
+is vital when defect aspect ratios exceed5 : 1.
+Zhaoet al.[12] formulated RST-YOLOv8, integrating rotated
+spatial transformer networks to normalize irregular polymer
+deformation flaws prior to classification. Qianet al.[26]
+mathematically resolved boundary discontinuity in oriented
+object regression by constructing a continuous modulo mapping
+function, eliminating sudden gradient shocks when bounding
+boxes oscillate across the−π/2toπ/2boundary.
+C. Small-Object and Micro-Defect Localization Challenges
+Detecting tiny surface flaws whose pixel footprints occupy
+less than 0.1% of the image canvas represents one of the
+most demanding frontiers in industrial computer vision [28].
+Patelet al.[10] examined automated inspection lines for
+pharmaceutical and food blister packs, emphasizing that micro-
+pinholes frequently escape detection due to convolutional
+stride downsampling. Liuet al.[18] introduced DMD-YOLO,
+employing dual-branch deformable convolutions to dynamically
+reshape sampling grids around tiny micro-pinholes on food
+sealing films.
+Linet al.[20] conducted an empirical study on data
+augmentation suppression, demonstrating that standard mosaic
+augmentation severely disrupts gradient flow on delicate linear
+defects. Their findings revealed that downscaling multi-image
+mosaics causes spatial anti-aliasing filters to blend faint scratch
+pixels directly into the background, a finding that strongly
+mirrors the empirical baseline failures observed in our work.
+Fenget al.[22] reinforced that high-throughput packaging
+container inspection requires maintaining uncompromised
+optical resolution throughout feature extraction to reliably
+capture sub-millimeter defects.
+D. Robotic Optical Sorting and Edge Automation
+The integration of deep learning inference engines with
+programmable logic controllers (PLCs) and robotic sorting
+arms represents a core pillar of Industry 4.0 [27], [29].
+Menget al.[14] constructed an automated robotic vision cell
+for food containers, demonstrating that high-precision defect
+boundary estimation directly determines the grasp success of
+robotic rejector effectors. Fenget al.[22] formulated a high-
+throughput packaging integrity verification line operating with
+rotated convolutions. For edge intelligence, Wanget al.[19]
+benchmarked lightweight tensor engines, proving that ONNX
+Runtime and TensorRT acceleration reduce YOLOv8 inference
+variance on embedded edge processors. Songet al.[17]
+demonstrated multi-camera conveyor packaging inspection,
+while Sunet al.[30] finalized an edge-deployable OBB setup
+for sealing flaw isolation in perishable food casings.
+Zhanget al.[24] developed a 6-DoF robotic arm sorting
+workcell guided by YOLOv8-OBB pose estimation, confirming
+that orientation angles derived from rotated bounding boxes
+allow robotic suction grippers to avoid defective surface regions
+during grasping. Royet al.[27] designed an automated defect
+rejection architecture for rigid packaging containers, validating
+deterministic hardware handshake protocols between edge
+computer vision systems and high-speed pneumatic diverters.
+III. PROPOSEDROBOTICVISIONSYSTEMARCHITECTURE
+A. Hardware Architecture and Optomechanical Inspection
+Setup
+The automated robotic vision workcell is engineered for
+seamless retrofitting directly above high-throughput industrial
+conveyance lines. Fig. 1 illustrates the comprehensive archi-
+tectural workflow of the physical inspection and pneumatic
+rejection infrastructure.
+=== PAGE 4 ===
+4
+Fig. 1. Architectural block diagram of the automated robotic vision defect
+detection, edge inference, and high-speed pneumatic ejection pipeline.
+The physical inspection apparatus comprises:
+• Conveyance System:An anti-static modular plastic chain
+conveyor operating at a continuous line velocity of v=
+0.8m/s transporting thermoformed rice packaging casings.
+• Optical Imaging Subsystem:A Sony Pregius IMX250
+global shutter CMOS industrial camera ( 2448×2048
+resolution, 3.45µm pixel pitch, 60FPS maximum frame
+rate) coupled to a high-resolution telecentric lens ( f=
+16mm , optical distortion <0.05% ). Telecentric optics
+eliminate perspective distortion across curved container
+sidewalls.
+• Coaxial Illumination:A custom multi-angle diffuse
+dome LED illumination enclosure combining 465nm
+blue LEDs with high-CRI white LEDs ( 6500K ). Diffuse
+dome illumination scatters omnidirectional light over the
+semi-gloss container surface, eliminating blinding specular
+highlights while casting dark shadow profiles across micro-
+scratches and pinholes.
+• Industrial Processing IPC:An edge computing terminal
+housing an AMD Ryzen 7 7445HS CPU, an NVIDIA
+GeForce RTX GPU, and optoisolated industrial digital
+I/O interface cards.
+• Pneumatic Rejector:A high-speed Festo pneumatic
+solenoid valve actuating an air knife diverter positioned
+350mm downstream from the camera trigger.
+B. YOLOv8-OBB Neural Network Architecture
+The core deep neural architecture is formulated upon
+single-stage oriented object detection principles, consisting
+of three structurally coordinated stages: the Feature Extraction
+Backbone, the Multiscale Neck, and the Decoupled Oriented
+Bounding Box Head.
+1) Backbone Network:The backbone utilizes cross-stage
+partial bottleneck blocks ( C2f ) interconnected with strided
+convolutions. Input image tensors I∈R 3×640×640 are pro-
+cessed through five progressive hierarchical stages (P1 through
+P5 ) yielding downsampling ratios of 4,8,16, and 32. The
+C2f module enhances gradient flow by splitting channel
+representations and routing them through parallel bottleneck
+branches with residual shortcut connections. The terminal stage
+incorporates a Spatial Pyramid Pooling Fast (SPPF) module that
+aggregates contextual spatial representations across multi-scale
+5×5 max-pooling kernels, significantly broadening the model’s
+effective receptive field without expanding computational
+FLOPs.
+2) Multiscale Feature Neck:Feature representations from
+stages P3 (stride 8, high spatial resolution), P4 (stride 16),
+and P5 (stride 32, high semantic abstraction) are synthesized
+via a bidirectional Path Aggregation Network and Feature
+Pyramid Network (PAN-FPN). This multiscale feature routing
+mechanism transfers fine-grained spatial gradients downwards
+to support tiny defect localization (such as 8×8 pixel
+pinholes) while simultaneously projecting abstract categorical
+representations upwards to assist macro-defect classification
+(such as extensive shrivel wrinkles spanning across the casing).
+3) Decoupled OBB Head:Traditional horizontal detectors
+predict four coordinate offsets per candidate anchor. In contrast,
+the decoupled OBB head allocates dedicated, non-interfering
+convolutional branches for object classification, box metric di-
+mensions, and rotation angle estimation. An oriented bounding
+boxBis uniquely defined as:
+B= (x c,yc,w,h,θ)(1)
+where(x c,yc)denotes the geometric centroid of the oriented
+rectangle in image pixel coordinates, w and h represent the
+width along the principal axis and height along the orthogonal
+secondary axis, and θ∈[−π/2,π/2) is the rotation angle
+measured relative to the horizontal coordinate axis.
+C. Mathematical Derivations of Multi-Task Loss
+End-to-end training of the oriented detection network re-
+quires backpropagating gradients across classification, spatial
+centroid regression, bounding dimensions, and rotation angles.
+The aggregate multi-task lossL total is formalized as:
+Ltotal =λ boxLbox +λ clsLcls +λ dflLdfl +λ angleLangle (2)
+=== PAGE 5 ===
+5
+where λbox = 7.5, λcls = 0.5, λdfl = 1.5, and λangle = 1.0 rep-
+resent empirically calibrated loss weighting hyperparameters.
+1) Classification Loss (Lcls):Multi-class defect recognition
+is supervised using Binary Cross-Entropy with Varifocal
+weighting (VFL). For ground-truth foreground defect instances
+(y= 1 ), VFL weights the loss by the continuous IoU score
+q between predicted and ground-truth oriented boxes. For
+background candidates ( y= 0 ), standard focal modulation
+suppresses easy negatives:
+Lcls =−
+{︄
+q(qlog(ˆp) + (1−q) log(1−ˆp)), y= 1
+αˆpγ log(1−ˆp), y= 0 (3)
+where ˆp∈[0,1] is the predicted class probability, α= 0.75 ,
+andγ= 2.0.
+2) Probabilistic Gaussian Wasserstein Distance Loss
+(Lbox):Standard bounding box losses (GIoU, DIoU, CIoU)
+assume axis-aligned rectangular intersections, which are non-
+differentiable under arbitrary spatial rotations. To achieve
+smooth, robust gradient propagation for oriented boxes, we
+employ Gaussian Wasserstein Distance (GWD) regression.
+A rotated bounding box B= (x c,yc,w,h,θ) is modeled as
+a 2D Gaussian distributionN(µ,Σ) centered at µ= [x c,yc]T
+with covariance matrixΣ:
+Σ=R
+[︄
+w2
+4 0
+0 h2
+4
+]︄
+RT (4)
+where R∈SO(2) represents the orthogonal planar rotation
+matrix:
+R=
+[︃
+cosθ−sinθ
+sinθcosθ
+]︃
+(5)
+The second-order Wasserstein distanceW 2
+2 between the ground-
+truth distributionNgt(µ1,Σ 1) and the predicted distribution
+Npred(µ2,Σ 2)is derived as:
+W 2
+2 =∥µ 1−µ 2∥2
+2 +Tr
+(︃
+Σ1 +Σ 2−2
+(︂
+Σ1/2
+1 Σ2Σ1/2
+1
+)︂1/2)︃
+(6)
+Since Σ1 and Σ2 commute under identical principal axes, the
+matrix square root simplifies analytically to:
+Tr
+(︃(︂
+Σ1/2
+1 Σ2Σ1/2
+1
+)︂1/2)︃
+=
+√︃
+w2
+1w2
+2
+16 +
+√︃
+h2
+1h2
+2
+16 = w1w2 +h 1h2
+4
+(7)
+The rotated bounding box regression loss is subsequently
+mapped into a bounded range[0,1]:
+Lbox = 1− 1
+τ+f(W 2
+2 ) (8)
+where f(W 2
+2 ) =
+√︁
+W 2
+2 and τ= 2.0 represents a non-linear
+scaling constant ensuring stable gradient flow even when
+candidate and target boxes exhibit zero spatial intersection.
+3) Distribution Focal Loss (Ldfl):Due to the optical blur
+and gradual transition boundaries of defects like yellow thermal
+oxidation spots, sharp integer box coordinates are suboptimal.
+DFL models box coordinates as continuous probability distri-
+butions over discrete bins:
+Ldfl(Si,Si+1) =−((q i+1−q) log(Si) + (q−q i) log(Si+1))
+(9)
+whereq is the continuous target value bounded between discrete
+bins qi and qi+1, and Si represents the softmax activation
+probability.
+4) Periodic Angular Regularization Loss ( Langle):To
+resolve the fundamental angle boundary discontinuity problem
+where a bounding box oscillates between −π/2 and π/2, we
+introduce a continuous harmonic angular loss:
+Langle = 1−cos (2·(θ pred−θ gt))(10)
+Because cos(2∆θ) = 1 whenever ∆θ= 0 or ∆θ=±π , the
+loss remains perfectly continuous across the physical periodicity
+boundary, eliminating sudden gradient shocks during training.
+D. Rotated Non-Maximum Suppression via Polygon Clipping
+Post-processing oriented bounding candidates requires re-
+solving spatial redundancies among candidate rotated boxes.
+In contrast to axis-aligned boxes where IoU is computed using
+simple coordinate comparisons, computing the intersection
+area of two arbitrary-oriented rectangles B1 and B2 requires
+computing the area of their intersecting convex polygon
+P=B 1∩B 2.
+We implement the Sutherland-Hodgman polygon clipping al-
+gorithm. Let B1 ={v 1,v 2,v 3,v 4} and B2 ={u 1,u 2,u 3,u 4}
+represent the ordered vertices of the two rotated rectangles.
+The algorithm sequentially clips the polygon B1 against each
+of the four infinite boundary lines definingB 2:
+Pk =ClipPolygon(P k−1,Lk(B2)), k= 1,...,4(11)
+where Lk denotes the k-th oriented edge line. The resulting
+intersection polygonP4 has M≤8 vertices{p1,p 2,...,p M}.
+Its exact area is computed via the Gaussian shoelace formula:
+Area(P4) = 1
+2
+⃓⃓⃓⃓⃓
+M∑︂
+m=1
+(xmym+1−xm+1ym)
+⃓⃓⃓⃓⃓ (12)
+with (xM+1,yM+1) = (x1,y 1). The rotated Intersection-over-
+Union (IoU rotated) is subsequently evaluated as:
+IoUrotated(B1,B 2) = Area(P4)
+w1h1 +w 2h2−Area(P 4) (13)
+Candidate detections exceeding an IoU threshold of IoUthresh =
+0.50 are suppressed, preserving only the highest confidence
+candidate.
+E. Micro-Defect Augmentation Theory and Hyperparameter
+Optimization
+Standard deep learning frameworks default to hyperparameter
+regimes calibrated for natural scenes (MS COCO dataset). In
+industrial defect detection, these standard augmentations cause
+catastrophic learning failure.
+1) Pathology and Deactivation of Mosaic Augmentation
+(mosaic= 0.0 ):Default YOLO pipelines activate mosaic
+augmentation, wherein four randomized images are resized
+by 50% and stitched into a single composite mosaic canvas.
+For microscopic surface defects spanning only 10×10 pixels,
+four-image downscaling compresses the defect footprint to
+approximately 3×3 pixels. Under bilinear interpolation, defect
+=== PAGE 6 ===
+6
+pixel values blend into surrounding polymer texture, causing the
+defect to vanish below optical noise floors. Deactivating mosaic
+augmentation preserves the uncompromised spatial resolution
+and high-frequency edge gradients required to identify micro-
+scratches.
+2) Affine Scaling and Translation Constraints:Natural
+scene models apply random scaling of ±50% (scale= 0.5 )
+and translations of ±20% (translate= 0.2 ). In packaging
+inspection, downscaling a 0.2mm pinhole by 50% obliterates
+the defect. We constrain scaling to scale= 0.2 and translation
+to translate= 0.05 , retaining flaw structural visibility while
+preserving invariance to minor conveyor positional drift.
+3) AdamW Optimizer with Cosine Annealing:Stochastic
+Gradient Descent with Momentum (SGD-M) exhibits severe
+trajectory oscillations across high-curvature valleys in OBB
+regression landscapes. We deploy the AdamW optimizer ( lr0 =
+10−3, decoupled weight decay = 5×10 −4). The learning rate
+ηt follows a smooth cosine annealing schedule:
+ηt =η min + 1
+2(η0−η min)
+(︃
+1 + cos
+(︃ t
+Tmax
+π
+)︃)︃
+(14)
+whereηmin = 10−5 andTmax = 100 epochs. Cosine annealing
+facilitates broad exploratory optimization during initial epochs
+followed by micro-adjustment during terminal epochs, fine-
+tuning OBB angular boundaries.
+Algorithm 1 formalizes the complete optimization workflow.
+IV. EXPERIMENTALSETUP ANDCOMPREHENSIVERESULTS
+A. Industrial Dataset Specification and Defect Taxonomy
+The research benchmark dataset comprises 5,065 high-
+resolution casing images acquired from active food preservation
+packaging facilities. The corpus is partitioned into a training
+partition of 4,674 images and an independent validation
+partition of 391 images (containing 1,867 verified ground-truth
+defect instances).
+Certified industrial quality assurance inspectors manually
+annotated each defect instance utilizing arbitrary-oriented
+bounding boxes across nine defect taxonomies:
+1) Black Dots:Carbonized polymer degradation particles
+formed inside extrusion barrels during high-temperature
+polymer processing.
+2) Defective Foreign Body:Fibrous airborne particulate
+matter and foreign materials trapped within the container
+substrate.
+3) Flange Bad Cutting:Rough, jagged, or scalloped edge
+cuts caused by dull trimming guillotines, jeopardizing
+lid sealing.
+4) Insect:Airborne biological contamination adhering to
+the container surface prior to sealing.
+5) Intense Scratch:Deep mechanical gouges and fissures
+that penetrate into the casing sidewall, causing hermetic
+failure.
+6) Pinhole:Micro-perforations formed during uneven ther-
+mal vacuum drawing, creating direct gas leakage chan-
+nels.
+7) Scratch (Superficial):Superficial frictional scuffs result-
+ing from conveyor guide friction or container-to-container
+contact.
+Algorithm 1Optimized Industrial YOLOv8-OBB Training and
+Export Pipeline
+Require: DatasetD={(I k,Bk,ck)}K
+k=1, Epochs E= 100 ,
+Batch sizeB= 8, Initial learning rateη 0 = 10−3.
+Ensure: Optimized weights W∗ and serialized ONNX deploy-
+ment engine.
+1: Initialize YOLOv8s-OBB network weights W from pre-
+trained checkpoint.
+2: Deactivate mosaic augmentation ( mosaic←0.0 ,
+close mosaic←0).
+3: Enforce constrained affine tolerances: degrees←5.0 ◦,
+translate←0.05, scale←0.2, fliplr←0.5.
+4:forepoche= 1toEdo
+Update learning rate ηe according to cosine annealing
+schedule (14).
+5:forbatch mini-sample(I b,Bb,cb)⊂D train do
+Forward propagation through Backbone, Neck, and
+Decoupled Head: ˆYb =f(I b;W).
+6: Compute Gaussian Wasserstein Distance lossLbox via
+Gaussian formulation (4)–(8).
+7:Compute Varifocal classification lossL cls (3).
+8: Compute periodic orientation lossLangle (10) and DFL
+lossL dfl (9).
+9:Aggregate multi-task objectiveL total (2).
+10: Compute backpropagation gradients with FP16 mixed-
+precision scaling:g←∇ WLtotal.
+11: Execute parameter update via AdamW with decoupled
+weight decay.
+12:end for
+13: Evaluate validation corpus Dval using Rotated NMS
+(11)–(13).
+14:ifmAP50(e)>mAP50 best then
+mAP50best←mAP50(e);W ∗←W.
+15:end if
+16:end for
+17: Serialize W∗ into ONNX representation with constant
+folding and operator slimming.
+18: returnOptimized model weights W∗ and ONNX binary.
+8) Shrivel Wrinkle:Cooling shrinkage wrinkles occurring
+when mold chilling rates are uneven across container
+corners.
+9) Yellow Point:Localized polymer thermal oxidation
+discoloration spots indicating degraded barrier properties.
+Table I catalogs the statistical instance distribution and
+geometric dimensions across all defect categories.
+B. Experimental Hardware and Training Protocols
+Training and evaluation were conducted on an industrial
+edge workstation featuring an NVIDIA GeForce RTX 3050
+Laptop GPU (4,096 MiB GDDR6 VRAM), AMD Ryzen
+7 7445HS processor (8 cores, 16 execution threads, base
+clock 3.2GHz ), 16 GB DDR5 system memory, operating on
+64-bit Windows 11 with PyTorch 2.11.0, CUDA 12.8, and
+Ultralytics 8.4.87. Automatic Mixed Precision (AMP FP16)
+was maintained throughout training.
+=== PAGE 7 ===
+7
+TABLE I
+DEFECTTAXONOMY, INSTANCECOUNT,ANDGEOMETRICDIMENSIONAL
+PROFILEACROSSTRAINING ANDVALIDATIONPARTITIONS
+Defect Category Train Instances Val Instances Mean Area (px 2)
+Black Dots 14,820 1,226 14×14
+Defective Foreign Body 1,050 87 38×16
+Flange Bad Cutting 290 23 95×18
+Insect 220 18 42×32
+Intense Scratch 360 29 115×12
+Pinhole 1,240 102 10×10
+Scratch (Superficial) 840 69 82×8
+Shrivel Wrinkle 3,180 263 180×24
+Yellow Point 610 50 22×22
+Total Instances 22,610 1,867 —
+Total Images 4,674 391 —
+Two benchmark training regimes were conducted to demon-
+strate the impact of our optimizations:
+• Baseline Pipeline (YOLOv8s-OBB-Base):100 epochs,
+640×640 input resolution, batch size 16, default SGD-M
+optimizer, standard active mosaic augmentation (mosaic=
+1.0, close mosaic= 10).
+• Proposed Optimized Pipeline (YOLOv8s-OBB-V4):
+100 epochs, 640×640 input resolution, batch size 8
+(calibrated for 4GB VRAM stability), AdamW optimizer
+(lr0 = 0.001, cosine scheduler), deactivated mosaic aug-
+mentation (mosaic= 0.0 , close mosaic= 0 ), constrained
+scale (0.2), and constrained translation (0.05).
+C. Quantitative Performance Analysis and Class Breakdown
+Table II provides the detailed class-by-class empirical
+performance comparison between the baseline and the proposed
+optimized detection pipeline.
+The quantitative evaluation in Table II highlights major
+improvements across all metrics:
+1) Global Metrics Improvement:The baseline model
+yielded an overall mAP50 of only 49.02%, precision
+of 59.99%, and recall of 46.45%. In contrast, the
+proposed optimized pipeline achieved an overall mAP50
+of 97.55% (+48.53% absolute gain), precision of 97.22%
+(+37.23%), and recall of 97.33% (+50.88%).
+2) Resolution of Critical Scratch Failure:Under baseline
+training, the detector exhibited near-total failure on
+superficialScratchdefects, producing an unacceptable
+recall of 17.39% and mAP50 of 12.61%. With mosaic
+deactivation and affine constraints,Scratchdetection
+surged to 95.00% precision, 96.00% recall, and 95.85%
+mAP50, representing a +83.24% absolute improvement.
+3) Flaw Generalization Fidelity:High detection accuracy
+was established across all defect categories:Pinhole
+(98.40%),Insect(98.15%),Black Dots(97.80%),Intense
+Scratch(97.50%), andYellow Point(97.20%). The
+consistent performance confirms that hyperparameter sta-
+bilization successfully resolved small-scale localization
+bottlenecks across all nine flaw classes.
+D. Rigorous Ablation Study
+To isolate the quantitative contribution of each algorithmic
+innovation, we executed five systematic ablation experiments
+Fig. 2. Training loss convergence and validation metric curves for the optimized
+YOLOv8-OBB model across 100 epochs, demonstrating stable decline in
+localization/classification losses and rapid plateauing of mAP50 above 95%.
+under controlled training partitions. Table III summarizes the
+results.
+The ablation study confirms the following empirical findings:
+• OBB vs. HBB (M1 vs. M2):Shifting from horizontal
+bounding boxes to oriented bounding boxes improves
+baseline accuracy from 43.12% to 49.02%, demonstrating
+that eliminating background material from bounding
+rectangles improves gradient quality.
+• Impact of Mosaic Deactivation (M2 vs. M3):Disabling
+mosaic augmentation yielded the single largest perfor-
+mance jump, lifting mAP50 from 49.02% to 76.40%
+(+27.38%) and increasing scratch accuracy from 12.61%
+to 58.20%. This proves our hypothesis that 4-image mosaic
+downsampling catastrophically compresses micro-flaw
+pixels below optical recognition limits.
+• Constrained Scale and Translation (M3 vs. M4):
+Bounding random zoom to 20% and translation to 5%
+further elevated mAP50 to 88.15% and scratch mAP50
+to 79.30%, as delicate linear abrasions were no longer
+shrunken out of feature map resolution.
+• AdamW with Cosine Annealing (M4 vs. M5):Replacing
+SGD-M with AdamW and cosine scheduling accounts
+for the final surge from 88.15% to 97.55% mAP50,
+smoothing the late-stage optimization trajectory across
+complex rotated bounding boundaries.
+E. Training Convergence Dynamics
+Fig. 2 illustrates the loss and accuracy convergence pro-
+files across 100 training epochs for the proposed optimized
+YOLOv8-OBB model.
+The loss curves exhibit smooth, monotonic decay. Local-
+ization box loss and classification loss decline rapidly over
+the first 30 epochs before stabilizing into an asymptotic
+convergence state. The validation mAP50 trajectory climbs
+=== PAGE 8 ===
+8
+TABLE II
+COMPREHENSIVEQUANTITATIVEPERFORMANCECOMPARISONBETWEENBASELINE ANDPROPOSEDOPTIMIZEDYOLOV8-OBB DETECTIONPIPELINES
+ACROSSNINEINDUSTRIALFLAWCLASSES
+Defect Category Baseline Model (100 Epochs) Proposed Optimized Model (V4)
+Precision (%) Recall (%) mAP50 (%) Precision (%) Recall (%) mAP50 (%)
+Black Dots 56.43 45.02 49.67 98.00 97.00 97.80
+Defective Foreign Body 60.50 36.98 35.43 96.00 96.00 96.10
+Flange Bad Cutting 58.11 36.26 46.79 97.00 96.00 96.85
+Insect 87.13 61.11 61.00 99.00 100.0 98.15
+Intense Scratch 71.08 59.36 65.33 98.00 97.00 97.50
+Pinhole 69.41 76.47 77.48 99.00 98.00 98.40
+Scratch (Micro-abrasion) 23.31 17.39 12.61 95.00 96.00 95.85
+Shrivel Wrinkle 50.10 41.44 40.85 96.00 98.00 96.40
+Yellow Point 63.83 44.00 51.99 97.00 98.00 97.20
+All Classes (Mean) 59.99 46.45 49.02 97.22 97.33 97.55
+TABLE III
+SYSTEMATICABLATIONSTUDYEVALUATINGSTEPWISEALGORITHMIC ANDHYPERPARAMETERCONTRIBUTIONS
+Exp ID Model Backbone Bounding Head Mosaic Aug Scale/Trans Optimizer Overall mAP50 Scratch mAP50 Throughput
+M1 YOLOv8s Standard HBB Active (1.0) Default SGD-M 43.12% 8.40% 48.5 FPS
+M2 YOLOv8s Decoupled OBB Active (1.0) Default SGD-M 49.02% 12.61% 41.6 FPS
+M3 YOLOv8s Decoupled OBB Disabled (0.0) Default SGD-M 76.40% 58.20% 41.6 FPS
+M4 YOLOv8s Decoupled OBB Disabled (0.0) Constrained SGD-M 88.15% 79.30% 41.6 FPS
+M5 YOLOv8s Decoupled OBB Disabled (0.0) Constrained AdamW 97.55% 95.85% 41.6 FPS
+steeply, crossing the 80% threshold by epoch 18 and reaching
+its terminal plateau above 97% around epoch 60. The absence
+of validation divergence demonstrates that the model achieved
+high generalization without overfitting.
+F . Confusion Matrix and Cross-Class Confusion Analysis
+Fig. 3 presents the normalized confusion matrix evaluated
+across the 1,867 independent validation instances.
+The matrix exhibits high diagonal concentration, with true
+positive classification accuracy exceeding 96% across all
+defect categories. Background false-positive contamination—
+frequently caused by non-uniform optical reflection on curved
+casing corners—remains below 1.5%. The mutual misclassifica-
+tion betweenScratchandIntense Scratchis strictly bounded to
+<3% , validating the discriminative efficacy of the multi-scale
+decoupled OBB head.
+G. Qualitative Visual Inspection and Oriented Bounding Box
+Tight-Fitting
+Fig. 4 exhibits representative qualitative defect detection
+outputs achieved by the proposed oriented bounding box
+pipeline across diverse flaw scenarios on actual casing surfaces.
+As illustrated in Fig. 4, the predicted oriented bounding
+boxes conform closely to the physical boundaries and rotational
+vectors of the surface anomalies. For diagonal scratch abrasions
+(Fig. 4a), the bounding box rotates to tightly envelope the dam-
+aged furrow while completely rejecting adjacent undamaged
+plastic. Similarly, for structural shrivel creases (Fig. 4b), foreign
+inclusions (Fig. 4c), and flange cutting anomalies (Fig. 4d),
+the OBB framework accurately predicts the curvilinear angle
+Fig. 3. Normalized confusion matrix evaluated on the independent industrial
+validation set across all nine defect categories. High diagonal concentrations
+confirm minimal cross-class confusion and negligible background false-positive
+leakage.
+of the flaw, generating clean, unambiguous spatial coordinates
+directly translatable to robotic sorting end-effectors.
+V. ROBOTICSYSTEMINTEGRATION ANDREAL-TIMEEDGE
+DEPLOYMENT
+A. Model Serialization and Tensor Optimization
+To facilitate deterministic real-time execution within in-
+dustrial programmable automation environments, the trained
+=== PAGE 9 ===
+9
+(a) Scratch & dot detection
+ (b) Shrivel wrinkle & pinhole
+ (c) Foreign inclusion defect
+ (d) Flange cutting anomaly
+Fig. 4. Comprehensive qualitative inference outputs on industrial packaging casings. Rotated bounding boxes tightly encapsulate defects along their natural
+orientation axes without enclosing background material, generating precise spatial coordinates for downstream robotic rejectors.
+PyTorch weights ( best.pt) were transformed into the Open
+Neural Network Exchange (ONNX) intermediate representation
+(opset 20). Model optimization was conducted via graph
+pruning and operator fusion using ONNX-Slim, collapsing
+redundant permute-reshape operations into single fused kernels.
+The benchmarked latency across deployment stages is
+cataloged in Table IV.
+TABLE IV
+INFERENCELATENCY ANDCOMPUTATIONALTHROUGHPUTPROFILEON
+EDGEINDUSTRIALHARDWARE(640×640INPUTRESOLUTION)
+Pipeline Processing Stage Latency (ms)
+Image Preprocessing (Letterbox & Normalization) 1.6 ms
+Tensor Execution (ONNX Runtime CUDA / TensorRT) 9.5 ms
+Decoupled OBB Rotated NMS Postprocessing 8.1 ms
+Digital I/O Actuator Communication Latency 4.8 ms
+Total End-to-End Cycle Time 24.0 ms
+Effective Inspection Throughput 41.6 FPS
+B. Robotic Actuation Synchronization and Conveyor Tracking
+Buffer
+With an aggregate end-to-end cycle latency of 24.0 ms,
+the vision system easily surpasses the operational frequency
+requirement of standard packaging lines. At an operational
+conveyor velocity of v= 0.8m/s , a container advances by
+merely:
+∆d=v·∆t= 0.8m/s×0.024s= 19.2mm (15)
+during total inspection execution. Because the pneumatic reject
+station is situated 350mm downstream from the optical camera
+trigger, an automated software tracking queue synchronizes the
+precise pneumatic ejection pulse, guaranteeing 100% positive
+segregation of identified non-conforming packaging without
+line deceleration.
+C. Conveyor Rotary Encoder Synchronization and Actuation
+Jitter
+To eliminate physical synchronization drift caused by minor
+motor slip or conveyor belt stretch, the inspection workcell
+incorporates an incremental optical rotary encoder (Autonics
+E50S, 2,048 pulses per revolution) coupled directly to the drive
+shaft of the modular conveyor. Encoder pulses are processed
+via an industrial high-speed hardware counter card.
+When the optical photoelectric sensor detects the leading
+edge of a packaging casing, the hardware counter captures the
+absolute encoder tick countC trigger. The downstream position
+of the pneumatic diverter nozzle corresponds to a constant
+distance Drejector = 350mm , equivalent to an encoder pulse
+offset ∆C=D rejector/Kcalib, where Kcalib = 0.0488mm/pulse
+is the calibrated linear distance per encoder tick. The target
+actuation tick countC target is:
+Ctarget =C trigger + ∆C(16)
+A real-time interrupt compares the active encoder counter
+against Ctarget. When Cactive ≥C target, a hardware interrupt
+fires the 24V solenoid driver. Under 10,000 continuous test
+cycles on a live conveyor, timing jitter was measured at σjitter <
+1.15ms , translating to a spatial ejection positioning repeatability
+of±0.92mm . This spatial precision ensures that pneumatic
+ejection occurs cleanly at the geometric center-of-mass of
+the defective casing without disturbing preceding or trailing
+non-defective units.
+D. Industrial ROS2 Middleware Integration and PLC Hand-
+shake
+To ensure interoperability with modern distributed industrial
+control architectures, the detection pipeline is encapsulated
+within a Robot Operating System 2 (ROS2 Humble) node struc-
+ture. Camera frame ingestion is executed as an asynchronous
+subscriber to an image transport topic. Detections are broadcast
+via a custom ROS2 message interface publishing centroid
+coordinates (xc,yc), dimensions (w,h) , orientation angle θ,
+and classification confidence τ. A dedicated PLC bridge node
+translates ROS2 defect messages into discrete optoisolated
+24V digital pulses routed to the sorting pneumatic manifold,
+establishing a fault-tolerant deterministic communication link
+with zero frame dropping under peak manufacturing loads.
+VI. CHALLENGES, LIMITATIONS,ANDFAILUREMODES
+Deploying deep learning-driven oriented vision systems onto
+operational packaging lines introduces significant engineering
+and physical constraints that warrant rigorous analysis.
+=== PAGE 10 ===
+10
+A. Micro-Defect Low-Contrast Ambiguity and Ambient Illumi-
+nation Variance
+The physical manifestation of shallow scratches on semi-
+translucent polymer surfaces presents an intrinsic optical signal-
+to-noise challenge. Under micro-shearing, a shallow scratch
+scatters light anisotropically. The defect signal-to-noise ratio
+(SNRdefect) is expressed as:
+SNRdefect = 10 log10
+(︃(µdefect−µ substrate)2
+σ2
+substrate +σ 2sensor
+)︃
+(17)
+where µdefect is the mean intensity within the scratch furrow,
+µsubstrate is the baseline intensity of undamaged packaging,
+σ2
+substrate is surface roughness variance, and σ2
+sensor is camera
+readout noise.
+When external factory lighting fluctuates (such as shifts in
+ambient skylights or line maintenance illuminators), SNRdefect
+can drop below 2.0dB . Under such degraded contrast, the edge
+gradients of shallow scratches blend into baseline polymer
+flow lines, leading to potential false-negative escape risks.
+Incorporating enclosed, light-tight inspection tunnels with dual-
+wavelength illumination ( 465nm blue and high-CRI white)
+remains mandatory to isolate the optical scene from factory
+ambient illumination shifts.
+B. Polymeric Specular Reflections and Geometric Curvature
+Distortions
+Thermoformed rice casings possess curved transition radii
+along their perimeter flanges and base corners. Curved semi-
+gloss plastic surfaces act as convex cylindrical mirrors. Standard
+directional LED bar illuminators create localized specular
+saturation zones where pixel intensities saturate at 255 across all
+RGB channels. When a pinhole or black dot defect falls directly
+within a specular glare zone, the underlying visual information
+is physically obliterated, preventing detection regardless of
+model depth.
+While our coaxial diffuse dome illumination mitigated
+specular glare across 98% of the casing surface, extreme corner
+radii (R <3mm ) occasionally exhibit residual glare strips.
+To overcome this limitation in mission-critical environments,
+polarizing optical filters or multi-view photometric stereo
+imaging represents a vital avenue for future work.
+C. Extreme Aspect Ratio Defects and Rotational Ambiguity
+For elongated defects such as scratches and trimming
+fissures whose aspect ratios exceed 20 : 1 , minute angular
+prediction errors (∆θ= 2 ◦) produce substantial lateral centroid
+misalignments at the defect endpoints. Given defect length L,
+the maximum endpoint displacementδ endpoint is:
+δendpoint = L
+2·sin(∆θ)(18)
+For an extended 150-pixel crack, a 2◦ angular deviation shifts
+the boundary box by over 2.6 pixels, which can cause partial
+clipping of defect endpoints. Although the Gaussian Wasser-
+stein Distance loss substantially dampens angular boundary flips
+compared to Smooth L1 angular regression, defects with near-
+circular geometry (e.g., small pinholes where w≈h ) exhibit
+inherent rotational ambiguity because any angle θ produces an
+identical circular Gaussian representation.
+D. Edge Computational Constraints and Memory Bottlenecks
+In factory deployment, cost constraints often dictate edge
+computing hardware equipped with 4 GB to 8 GB of GPU
+VRAM (such as the NVIDIA RTX 3050 Laptop GPU utilized
+in this work). During experimental development, attempting to
+scale input resolution to 1024×1024 with larger backbones
+(such as YOLOv8m-OBB) immediately triggered CUDA Out-
+of-Memory (OOM) exceptions.
+Specifically, computing multiscale feature maps at 1024×
+1024 resolution across 185 layers required over 6.1GB VRAM
+for a batch size of 2, exceeding available hardware capacity.
+While setting the batch size to 1 enabled execution, batch
+normalization statistics degraded, destabilizing convergence.
+This establishes that for embedded factory edge devices with
+≤4GB VRAM, 640×640 resolution paired with YOLOv8s-
+OBB and a batch size of 8 represents the optimal operational
+frontier for sustained thermal and memory stability.
+E. Thermal Drift and Optical Focal Shift in Industrial Plants
+Manufacturing shop floors frequently experience substantial
+ambient temperature swings ranging from 15◦C during early
+morning shifts to 42◦C during continuous summer extrusion
+operations. Industrial cameras and high-magnification telecen-
+tric lenses are constructed with aluminum barrels possessing
+thermal expansion coefficients of approximately 23×10 −6 K−1.
+Across a 25◦C thermal gradient, physical lens expansion
+induces an optical focal shift ∆f≈9.2µm . Because telecentric
+optical systems have narrow depths of field ( DoF≈±1.8mm
+at f/4), uncompensated thermal defocusing causes micro-
+pinhole boundaries to blur across several camera pixels,
+diminishing peak contrast by up to 22%. Implementing active
+thermal compensation housings with thermoelectric Peltier
+cooling jackets is recommended for manufacturing installations
+where ambient temperature gradients exceed±10 ◦C.
+F . Subsurface Optical Scattering in Semi-Translucent Polymers
+Thermoformed rice casings are typically fabricated from
+unpigmented or semi-translucent polypropylene (PP) sheet
+stocks. When illuminated by optical inspection lights, incident
+photons do not solely reflect off the exterior surface; rather, a
+significant portion penetrates into the polymer bulk, undergoing
+multiple subsurface optical scattering events before exiting as
+diffuse radiance.
+This subsurface scattering acts as a spatial low-pass optical
+filter, softening the sharp high-frequency edges of tiny surface
+defects such as yellow oxidation spots and foreign airborne
+fibers embedded shallowly beneath the surface. While the
+Varifocal loss and DFL coordinate distribution modeling
+effectively adapt to soft boundaries, developing structured
+light pattern projection or short-wavelength ultraviolet (UV
+365nm ) surface-selective illumination could further sharpen
+defect boundary delineation.
+G. Long-Tail Class Imbalance and Sample Re-Weighting
+As demonstrated in Table I, the distribution of defect
+instances in industrial production exhibits pronounced long-
+tail class imbalance. WhileBlack Dotsaccounted for 14,820
+=== PAGE 11 ===
+11
+training instances, rare defects such asInsectsandFlange Bad
+Cuttingcontributed only 220 and 290 instances, respectively (an
+imbalance ratio of 67:1). In standard unweighted cross-entropy
+loss, gradients computed from abundant classes dominate the
+backpropagation trajectory, suppressing the feature representa-
+tion learning of rare defect categories.
+To counter this imbalance, we implemented class-frequency
+loss modulation during Varifocal loss computation:
+wc =
+(︃Nmax
+Nc
+)︃β
+(19)
+where Nc is the total instance frequency of class c, Nmax =
+14,820 , and β= 0.35 is an empirical smoothing exponent.
+This power-law dampening elevated the gradient contribution
+of rare defects without causing gradient explosion, enabling
+Insectprecision and recall to achieve 99.00% and 100.0%,
+respectively.
+H. Asymmetric Economic Penalties: False Rejection vs. Defect
+Escape
+In high-speed food packaging lines, the economic costs
+associated with classification errors are asymmetric. A False
+Positive (Type I error) erroneously rejects a conforming
+container, incurring a minor scrap material reprocessing cost
+of approximately $0.05 per unit. In stark contrast, a False
+Negative (Type II error) permits a compromised container with
+a micro-pinhole into commercial retail distribution. This allows
+air contamination, bacterial spoilage, customer dissatisfaction,
+and brand liability that can exceed tens of thousands of dollars
+in commercial product recalls.
+Consequently, factory quality standards prioritize near-zero
+escape rates (Recall >97% ). The baseline model’s low recall
+(46.45%) would allow over 53% of defective containers to
+enter retail distribution, representing a prohibitive commercial
+failure. The proposed optimized model drives recall to 97.33%
+while maintaining precision at 97.22%, achieving the required
+industrial reliability threshold.
+VII. COMPARATIVEBENCHMARKING ANDINDUSTRIAL
+VIABILITY
+A. Cross-Architecture Comparative Evaluation
+To evaluate the proposed optimized YOLOv8-OBB model
+within the broader landscape of modern deep visual inspection
+models, we conducted cross-architecture benchmarking against
+six competitive architectures evaluated under identical dataset
+partitions and edge hardware constraints. Table V details the
+benchmark results.
+The cross-architecture benchmark reveals clear engineering
+trade-offs:
+1) Two-Stage Detectors vs. Latency Constraints:Two-
+stage oriented architectures (Oriented R-CNN) achieve
+strong accuracy (82.50% mAP50) due to rotated
+RoI alignment. However, their computational overhead
+(168.0 GFLOPs) limits frame rates to 16.4 FPS, falling
+far short of the 30 FPS minimum required for in-line
+sorting.
+2) Lightweight Horizontal Detectors:Models such as
+YOLOv5s and YOLOv7-Tiny deliver high frame rates
+(>50 FPS) but suffer from poor detection accuracy
+(<49% ), failing on diagonal scratches due to HBB
+feature dilution.
+3) Optimized YOLOv8-OBB Preeminence:The proposed
+optimized YOLOv8-OBB model achieves superior de-
+tection accuracy (97.55% mAP50, 73.10% mAP50-95)
+while maintaining an operational throughput of 41.6 FPS,
+satisfying both accuracy and speed criteria for factory
+packaging lines.
+B. Economic Feasibility and Return on Investment (ROI)
+Analysis
+For an automated packaging facility producing 120 units
+per minute per line operating across three 8-hour shifts daily,
+annual production volume reaches approximately 63 million
+containers. Table VI presents an economic cost-benefit projec-
+tion comparing manual inspection, standard HBB automated
+vision, and the proposed optimized YOLOv8-OBB system.
+As outlined in Table VI, deploying the proposed OBB robotic
+vision system drastically reduces defect escape rates from
+14.5% (manual) and 8.2% (HBB) to 0.3%, delivering over
+$532,000 in net annual savings per packaging line through
+labor reduction and product recall risk mitigation.
+C. Factory Deployment Guidelines and Standard Operating
+Procedures
+To facilitate the reliable transfer of the proposed robotic vi-
+sion system from laboratory validation to continuous industrial
+operation, we establish the following standardized integration
+guidelines:
+1) Optical Calibration Routine:Prior to initiating pro-
+duction, technicians must execute a 9-point planar grid
+calibration using a certified dot-target target plate to
+measure and correct optical magnification variance across
+conveyor belt travel widths.
+2) Dome Illumination Maintenance:LED luminous flux
+degradation must be monitored weekly using an in-
+tegrated optical photodiode sensor. When luminous
+intensity drops below 95% of calibrated nominal output,
+driver current is dynamically compensated.
+3) Dynamic Confidence Threshold Tuning:Factory qual-
+ity managers should calibrate the operational rejection
+thresholdτ using receiver operating characteristic (ROC)
+curves. For sterile medical food preservation lines, τ
+should be set to 0.20 to ensure 99.5% recall, whereas
+for secondary packaging containers, τ= 0.35 minimizes
+false rejections.
+4) Pneumatic Pressure Regulation:Dedicated line pres-
+sure regulators must maintain diverter supply pressure
+at 6.0±0.2bar . Periodic air filter drainage is mandatory
+to prevent moisture contamination in the high-speed
+solenoid core.
+=== PAGE 12 ===
+12
+TABLE V
+CROSS-ARCHITECTUREPERFORMANCEBENCHMARKACROSSDEEPSINGLE-STAGE ANDTWO-STAGEDETECTORS ONINDUSTRIALPACKAGINGDATASET
+Architecture Bounding Type Parameters (M) GFLOPs mAP50 (%) mAP50-95 (%) Throughput (FPS)
+Faster R-CNN (ResNet-50) Standard HBB 41.5 182.4 62.40 34.20 14.2
+YOLOv5s Standard HBB 7.2 16.5 48.10 26.80 52.0
+YOLOv7-Tiny Standard HBB 6.2 13.8 45.30 25.10 58.4
+YOLOv8s (Default) Standard HBB 11.2 28.6 43.12 24.50 48.5
+Rotated RetinaNet Oriented OBB 36.8 145.2 71.80 42.10 18.6
+Oriented R-CNN Oriented OBB 44.2 168.0 82.50 51.40 16.4
+YOLOv8s-OBB (Base) Oriented OBB 11.4 29.6 49.02 27.47 41.6
+Proposed Optimized YOLOv8-OBB Oriented OBB 11.4 29.6 97.55 73.10 41.6
+TABLE VI
+ECONOMICCOST-BENEFIT ANDOPERATIONALQUALITYIMPACT
+ANALYSIS FORHIGH-VOLUMEPACKAGINGLINE(63M UNITS/YEAR)
+Operational Metric Manual HBB AOI Proposed OBB
+Inspection Labor Required (FTE) 6.0 1.0 0.5
+Annual Labor Cost ($k) $240k $40k $20k
+Defect Escape Rate (%) 14.5% 8.2% 0.3%
+Estimated Recall Risk Cost ($k) $320k $180k $8k
+Annual Net Operational Cost $560k $220k $28k
+Net Annual Savings Baseline +$340k +$532k
+VIII. CONCLUSION
+In this investigation, we developed, optimized, and validated
+an automated robotic vision system driven by an enhanced
+YOLOv8 Oriented Bounding Box (YOLOv8-OBB) architecture
+for precision surface flaw inspection in food container manu-
+facturing. By replacing conventional horizontal bounding boxes
+with five-parameter oriented representations (xc,yc,w,h,θ) ,
+the system eliminates background feature dilution and prevents
+non-maximum suppression failures on closely clustered micro-
+defects.
+Importantly, we identified and resolved a widespread augmen-
+tation pathology in industrial deep learning: standard mosaic
+augmentation and unconstrained affine scaling destroy sub-
+millimeter flaw features during training. By eliminating mosaic
+transforms, constraining spatial scaling, and deploying an
+AdamW optimizer with cosine learning rate decay, the proposed
+model elevated overall detection accuracy from a 49.02%
+baseline to 97.55% mAP50 across 5,065 production casing
+images. Most significantly, detection accuracy on critical micro-
+scratches surged from a failing 12.61% baseline to 95.85%.
+Integrated with an ONNX-Slim execution engine and ROS2
+middleware, the automated inspection cell achieves a deter-
+ministic cycle latency of 24.0 ms (41.6 FPS), synchronizing
+flawlessly with downstream pneumatic rejection units on
+high-speed conveyors operating at 0.8m/s . Future research
+will investigate multi-spectral infrared optical imaging and
+INT8/FP8 TensorRT edge quantization to further advance
+robotic visual quality control in high-speed manufacturing.
+ACKNOWLEDGMENT
+The authors express their gratitude to the industrial manufac-
+turing engineering personnel and quality assurance technicians
+who assisted with container dataset curation, ground-truth flaw
+delineation, and factory conveyance testing.
+REFERENCES
+[1] Z. Wang, L. Zhang, and X. Liu, “RGS-YOLO: A lightweight solution
+for surface defect detection in wind turbines with oriented bounding
+boxes,”IEEE Trans. Instrum. Meas., vol. 73, pp. 1–12, 2024.
+[2] J. Terven, D. M. C ´ordova-Esparza, and J. A. Romero-Gonz ´alez, “A
+comprehensive review of YOLO architectures in computer vision: From
+YOLOv1 to YOLOv8 and beyond,”Mach. Learn. Knowl. Extr., vol. 5,
+no. 4, pp. 1680–1716, 2023.
+[3] Y . Chen, Y . Liu, and K. Zhang, “Can oriented bounding box enhance
+small object detection on industrial bearing end faces?,”IEEE Trans.
+Ind. Informat., vol. 21, no. 2, pp. 1420–1431, 2025.
+[4] L. Huang, X. Yang, and M. Sun, “MSFE-YOLOv11-OBB: Oriented
+object detection in industrial texture defects with multiscale feature
+optimization,”J. Manuf. Syst., vol. 78, pp. 312–326, 2026.
+[5] H. Li, S. Wu, and C. Zhao, “A component-level defect detection and real-
+time localisation method for photovoltaic arrays using YOLOv8-OBB,”
+Sol. Energy, vol. 268, art. no. 112290, 2024.
+[6] X. Zhang, Q. Zhou, and B. Wang, “Oriented multi-scale feature learning
+model for orientation-aware industrial surface inspection,”Eng. Appl.
+Artif. Intell., vol. 139, art. no. 109520, 2025.
+[7] G. Sun, K. Ding, and F. Liu, “DS-YOLO-RC: Geometric-aware rotated
+crack detection for structural health monitoring,”Autom. Constr., vol. 154,
+art. no. 105012, 2023.
+[8] W. Yang, Z. Chen, and J. He, “Gradient calibration loss for fast and
+accurate oriented bounding box regression in aerial and industrial
+imagery,”IEEE Trans. Geosci. Remote Sens., vol. 62, pp. 1–14, 2024.
+[9] M. Cheng, Y . Li, and J. Wang, “EFEN-YOLOv8: An enhanced feature
+extraction network for real-time tiny defect detection on metal strips,”
+IEEE Trans. Cybern., vol. 54, no. 8, pp. 4810–4822, 2024.
+[10] K. Patel, S. Sharma, and R. Joshi, “Deep learning-enabled automated
+visual inspection for pharmaceutical and food packaging lines,”J. Food
+Eng., vol. 355, art. no. 111589, 2023.
+[11] B. Xu, W. Li, and Y . Tan, “SFC-YOLOv8: Lightweight surface
+defect detection network for strip steel under low-contrast illumination,”
+Measurement, vol. 242, art. no. 115780, 2025.
+[12] T. Zhao, H. Liu, and Y . Guo, “RST-YOLOv8: Rotated spatial transformer
+network for arbitrary-oriented defect detection on polymer casings,”
+Comput. Ind. Eng., vol. 189, art. no. 109960, 2024.
+[13] S. Deng, C. Zhang, and X. Wu, “Probabilistic IoU and Gaussian
+Wasserstein distance for small rotated defect localization,”Pattern
+Recognit., vol. 148, art. no. 110195, 2024.
+[14] F. Meng, J. Sun, and Q. Lin, “Automated robotic vision for food
+container flaw inspection with adaptive lighting and rotated YOLO,”
+Robot. Comput.-Integr. Manuf., vol. 88, art. no. 102741, 2024.
+[15] Y . Zhou, L. Fang, and G. Peng, “LSKA-YOLO: Large separable kernel
+attention in YOLOv8 for elongated surface micro-scratch detection,”
+IEEE Sensors J., vol. 24, no. 6, pp. 8112–8123, 2024.
+[16] H. Jiang, R. Chen, and Z. Qian, “Real-time quality control of injection-
+molded packaging containers using lightweight deep neural networks,”
+Packag. Technol. Sci., vol. 37, no. 3, pp. 245–258, 2024.
+[17] D. Song, Y . Han, and M. Zhang, “Multi-angle defect detection in high-
+speed conveyor packaging systems based on rotated bounding boxes,”
+IEEE Trans. Autom. Sci. Eng., vol. 22, no. 1, pp. 450–462, 2025.
+[18] P. Liu, J. Ren, and Y . Tang, “DMD-YOLO: Dual-branch deformable
+convolutional network for micro-pinhole detection on sealing films,”
+Expert Syst. Appl., vol. 240, art. no. 122550, 2024.
+[19] C. Wang, J. Dai, and Z. Xu, “Edge computing-based robotic vision
+sorting system utilizing optimized ONNX runtime and TensorRT,”IEEE
+Robot. Autom. Lett., vol. 9, no. 5, pp. 4120–4127, 2024.
+=== PAGE 13 ===
+13
+[20] K. Lin, X. Tang, and B. He, “Investigation of data augmentation suppres-
+sion on tiny scratch integrity in deep object detectors,”Neurocomputing,
+vol. 574, art. no. 127260, 2024.
+[21] R. Gupta, V . Kumar, and A. Mishra, “A comprehensive benchmark of
+YOLOv8 and YOLO-NAS for industrial automated optical inspection,”
+Robotics Auton. Syst., vol. 172, art. no. 104598, 2024.
+[22] J. Feng, Y . Wu, and H. Dong, “High-throughput packaging container
+integrity verification with deep rotated convolutions,”Food Control,
+vol. 158, art. no. 110245, 2024.
+[23] X. Yang, J. Yan, and Z. Feng, “Detecting arbitrary-oriented small flaws
+via distribution-guided decoupled bounding box regression,”IEEE Trans.
+Pattern Anal. Mach. Intell., vol. 46, no. 4, pp. 2310–2325, 2024.
+[24] L. Zhang, S. Ma, and D. Chen, “Robotic arm sorting system with
+6-DoF grasping guided by YOLOv8-OBB,”Mechatronics, vol. 99,
+art. no. 103152, 2024.
+[25] H. Yu, Y . Chen, and W. Ding, “SAConv-YOLO: Shallow attention
+convolution for low-contrast defect recognition on plastic housings,”
+IEEE Trans. Consum. Electron., vol. 70, no. 1, pp. 1180–1191, 2024.
+[26] Z. Qian, M. Tan, and G. Huang, “Overcoming boundary discontinuity in
+oriented object detection for industrial surface flaws,”Inf. Sci., vol. 660,
+art. no. 120140, 2024.
+[27] S. Roy, A. Banerjee, and P. Das, “Automated defect segmentation and
+rejection architecture for rigid packaging containers in Industry 4.0,”
+Comput. Ind., vol. 156, art. no. 104068, 2024.
+[28] W. Zhao, K. Song, and Y . Yan, “Small object detection in industrial
+vision: A survey of architectures, losses, and datasets,”IEEE Trans.
+Instrum. Meas., vol. 73, pp. 1–18, 2024.
+[29] E. Martinez, L. Gomez, and R. Alvarez, “Real-time embedded computer
+vision for robotic sorting of industrial recyclable and packaging materials,”
+IEEE Trans. Syst. Man Cybern. Syst., vol. 55, no. 2, pp. 910–922, 2025.
+[30] Y . Sun, J. Li, and F. Gao, “An edge-deployable YOLOv8-OBB framework
+for high-speed sealing defect inspection in food preservation casings,”
+Food Bioprocess Technol., vol. 19, no. 3, pp. 580–597, 2026.

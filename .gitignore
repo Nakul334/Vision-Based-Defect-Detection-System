@@ -1,0 +1,54 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Exclude ALL PDF reports and archives (Per instruction: dont upload the pdf report)
+*.pdf
+*.zip
+*.docx
+
+# Exclude heavy model weight checkpoints and local training datasets (>100MB)
+*.pt
+Rice_Defect_Detection_OBB/runs/
+Rice_Defect_Detection_OBB/dataset/
+Rice_Defect_Detection_OBB/paper/
+train/
+valid/
+
+# LaTeX build auxiliary files
+*.aux
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+
+# Exclude factory cleanroom images and submission screenshots (Per instruction: dont add the factory images into github)
+*factory*
+factory_*.jpg
+factory_*.png
+proof_ieee_submission.png
+Journal_submission_proof.png
+template_logo.jpg
+template_prisma.jpg
+template_dump.txt
+preview_*.png
+
+# Exclude unzipped / external duplicate directories
+LocalDealer_MajorReport/
+LocalDealer_MajorReport.zip
+Rice_Defect_Detection_MajorReport/
+Rice_Defect_Detection_LaTeX/images/factory_hmi_vision_view.jpg
+Rice_Defect_Detection_LaTeX/images/factory_installation_enclosure.jpg
+Rice_Defect_Detection_LaTeX/images/proof_ieee_submission.png
+Rice_Defect_Detection_LaTeX/main.pdf
+
+# OS artifacts
+Thumbs.db
+.DS_Store
