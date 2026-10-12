@@ -16,7 +16,12 @@ Rice_Defect_Detection_OBB/paper/
 train/
 valid/
 
-# LaTeX build auxiliary files
+# LaTeX directories and files (Per instruction: dont add latex into github)
+Rice_Defect_Detection_LaTeX/
+*.tex
+*.bib
+*.sty
+*.cls
 *.aux
 *.bbl
 *.blg

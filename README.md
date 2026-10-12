@@ -38,26 +38,32 @@ This repository implements an end-to-end industrial robotic vision inspection pi
 
 | Evaluation Metric | Visual Result |
 | :--- | :--- |
-| **Training & Loss Convergence** | ![Training Convergence](Rice_Defect_Detection_LaTeX/images/training_curves.png) |
-| **Normalized Confusion Matrix** | ![Confusion Matrix](Rice_Defect_Detection_LaTeX/images/confusion_matrix.png) |
-| **Precision-Recall Curve (OBB)** | ![PR Curve](Rice_Defect_Detection_LaTeX/images/BoxPR_curve.png) |
-| **Validation Predictions Batch** | ![Validation Predictions](Rice_Defect_Detection_LaTeX/images/val_batch0_pred.jpg) |
-| **Representative Flaw Samples** | ![Defect Samples](Rice_Defect_Detection_LaTeX/images/composite_defect_samples.jpg) |
+| **Training & Loss Convergence** | ![Training Convergence](output_images/training_curves.png) |
+| **Normalized Confusion Matrix** | ![Confusion Matrix](output_images/confusion_matrix.png) |
+| **Precision-Recall Curve (OBB)** | ![PR Curve](output_images/BoxPR_curve.png) |
+| **Validation Predictions Batch** | ![Validation Predictions](output_images/val_batch0_pred.jpg) |
+| **Representative Flaw Samples** | ![Defect Samples](output_images/composite_defect_samples.jpg) |
 
 ---
 
 ## 📂 Repository Structure
 
 ```text
-├── Rice_Defect_Detection_LaTeX/            # Complete LaTeX Project Source
-│   ├── main.tex                            # Primary document root
-│   ├── references.bib                      # 30 IEEE bibliographic references
-│   ├── frontmatter/                        # Front matter (cover, approval, abstract)
-│   ├── chapters/                           # Chapters 1-5 (Intro, Lit Survey, Method, Results, Conclusion)
-│   └── images/                             # Defect outputs, loss curves & diagrams
-├── data.yaml                               # Roboflow / YOLOv8 dataset configuration
-├── README.roboflow.txt                     # Dataset export metadata
-└── README.md                               # Project documentation
+├── Rice_Defect_Detection_OBB/          # YOLOv8-OBB model pipeline & execution scripts
+│   ├── train.py                        # Model training routine
+│   ├── validate.py                     # Metric validation script
+│   ├── predict.py                      # Defect inference script
+│   ├── export_model.py                 # ONNX / TensorRT export
+│   └── requirements.txt                # Python dependencies
+├── output_images/                      # Output figures, curves & defect inspection samples
+│   ├── training_curves.png             # Loss and mAP convergence graphs
+│   ├── confusion_matrix.png            # Multi-class confusion matrix
+│   ├── BoxPR_curve.png                 # Precision-recall curves
+│   ├── val_batch0_pred.jpg             # Model validation detection samples
+│   └── composite_defect_samples.jpg    # Sample container surface defects
+├── data.yaml                           # YOLOv8 dataset configuration
+├── README.roboflow.txt                 # Dataset export metadata
+└── README.md                           # Project documentation
 ```
 
 ---
