@@ -6,7 +6,7 @@
 [![Dataset](https://img.shields.io/badge/Dataset-5%2C065%20Images-purple.svg)]()
 
 > **Major Project-I**  
-> **Student:** Nakul S. Dube (Enrollment No.: DMET1323009 / C2023FE00055)  
+> **Student:** Nakul S. Dube (Enrollment No.: C2023FE00055)  
 > **Supervisor / H.O.D / Dean Academics:** Dr. Utkarsha Pacharaney  
 > **Coordinators:** Dr. Swapnil Gundewar, Dr. Subodh Daronde  
 > **Department:** Department of Artificial Intelligence and Machine Learning  
